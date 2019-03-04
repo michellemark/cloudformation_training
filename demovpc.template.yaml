@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: "A VPC for creating a demo web server"
+Resources:
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - '1'
+        - Fn::GetAZs: ''
+      CidrBlock: 10.0.10.0/24
+      VpcId:
+        Ref: DemoVPC
+      Tags:
+      - Key: Name
+        Value: PublicSubnet2
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+        Fn::Select:
+        - '0'
+        - Fn::GetAZs: ''
+      CidrBlock: 10.0.0.0/24
+      VpcId:
+        Ref: DemoVPC
+      Tags:
+      - Key: Name
+        Value: PublicSubnet1
+  DemoVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock: 10.0.0.0/16
+      Tags:
+      - Key: Name
+        Value: DemoVPC
+  EC2VPCG4DOX1:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId:
+        Ref: IGW
+      VpcId:
+        Ref: DemoVPC
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: DemoIGW
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: DemoVPC
+      Tags:
+      - Key: Name
+        Value: PublicRouteTable
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId:
+        Ref: PublicRouteTable
+      GatewayId:
+        Ref: IGW
+    DependsOn:
+    - EC2VPCG4DOX1
+  EC2SRTA2LEU2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1
+  EC2SRTA1NAM2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet2
+Outputs:
+  VpcId:
+    Description: "The id of the vpc"
+    Value: !Ref DemoVPC
+    Export:
+      Name: "mmark-demo-vpcid"
+  SubnetIds:
+    Description: "The comma separated list of subnets ids"
+    Value:
+      Fn::Join:
+        - ","
+        - - !Ref PublicSubnet1
+          - !Ref PublicSubnet2
+    # also done in one line with Value: !Join [‘,’, [!Ref PublicSubnet1, !Ref PublicSubnet2] ]
+    Export:
+      Name: "mmark-demo-subnetids"
+

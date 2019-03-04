@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "CloudFormation Template to create a wordpress server in existing vpc."
+Parameters:
+    ServerName:
+        Type: "String"
+        Description: "The name of the server."
+        Default: "EC2 Static Web Server"
+    InstanceType:
+        Type: "String"
+        Default: "t2.micro"
+        AllowedValues:
+            - "t2.micro"
+            - "m3.medium"
+            - "c5.large"
+        Description: "Enter the Instance Type for the WordPress Instance"
+    KeyName:
+        Type: AWS::EC2::KeyPair::KeyName
+        Description: "The EC2 Key Pair to allow SSH access to the instance"
+    TargetGroupArn:
+        Type: AWS::SSM::Parameter::Value<String>
+        Description: "The ssm parameter with load balancer target group"
+        Default: mmark-targetgroupparam
+Mappings:
+    RegionMap:
+        us-east-1:
+            "ami": "ami-1853ac65"
+        us-west-1:
+            "ami": "ami-bf5540df"
+        us-west-2:
+            "ami": "ami-d874e0a0"
+        us-east-2:
+            "ami": "ami-25615740"
+Resources:
+    MyASG:
+        Type: "AWS::AutoScaling::AutoScalingGroup"
+        Properties :
+            AutoScalingGroupName: "mmark-MyASG"
+            DesiredCapacity: "1"
+            LaunchConfigurationName: !Ref MyLC
+            MaxSize: "1"
+            MinSize: "1"
+            VPCZoneIdentifier:
+                - !Select [0, !Split [ ",", !ImportValue mmark-demo-subnetids]]
+                - !Select [1, !Split [ ",", !ImportValue mmark-demo-subnetids]]
+            Tags:
+                - Key: "Name"
+                  Value: !Ref ServerName
+                  PropagateAtLaunch: "true"
+                - Key: "Project"
+                  Value: "CloudFormation Immersion Day"
+                  PropagateAtLaunch: "true"
+            TargetGroupARNs:
+                - !Ref TargetGroupArn
+    MyLC:
+        Type: "AWS::AutoScaling::LaunchConfiguration"
+        Properties:
+            ImageId: !FindInMap [RegionMap, !Ref "AWS::Region", "ami"]
+            InstanceType: !Ref InstanceType
+            AssociatePublicIpAddress: True
+            KeyName: !Ref KeyName
+            SecurityGroups:
+                - !Ref MySG
+            UserData: !Base64 "#include\nhttps://awstechbootcamp.s3.amazonaws.com/bootstrap.sh"
+    MySG:
+        Type: "AWS::EC2::SecurityGroup"
+        Properties:
+            GroupName: "mmark-StaticEC2SecurityGroup"
+            GroupDescription: "Inbound Access Rules for Static EC2 Web Access"
+            SecurityGroupIngress:
+                -
+                    CidrIp: "0.0.0.0/0"
+                    Description: "Inbound SSH Access from the Internet"
+                    FromPort: "22"
+                    IpProtocol: "tcp"
+                    ToPort: "22"
+                -
+                    CidrIp: "0.0.0.0/0"
+                    Description: "Inbound HTTP Access from the Internet"
+                    FromPort: "80"
+                    IpProtocol: "tcp"
+                    ToPort: "80"
+            VpcId: !ImportValue mmark-demo-vpcid
